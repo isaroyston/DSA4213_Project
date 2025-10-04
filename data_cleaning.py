@@ -92,6 +92,6 @@ try:
     engine = create_engine(conn_str)
     df_train.to_sql("newsgroups_train", engine, if_exists="replace", index=False)
     df_test.to_sql("newsgroups_test", engine, if_exists="replace", index=False)
-    print("\n ✓ Saved cleaned datasets into PostgreSQL")
+    print("\n Saved cleaned datasets into PostgreSQL")
 except Exception as e:
     print("\n[ERROR] Could not save to PostgreSQL:", e)
