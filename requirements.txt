@@ -21,3 +21,8 @@ spacy==3.8.7
 # Utilities
 tqdm==4.67.1
 matplotlib==3.10.6
+
+# Environment & Database
+python-dotenv==1.0.1
+SQLAlchemy==2.0.36
+psycopg2-binary==2.9.9
