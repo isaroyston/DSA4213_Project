@@ -1,6 +1,6 @@
 # Core ML / Fine-tuning
 scikit-learn==1.7.2
-numpy==2.2.6
+numpy==1.26.4
 pandas==2.3.3
 transformers==4.57.0
 accelerate==1.10.1
@@ -16,7 +16,8 @@ pydantic==2.11.9
 # Data Cleaning
 regex==2025.9.18
 nltk==3.9.2
-spacy==3.8.7
+spacy==3.7.5
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 
 # Utilities
 tqdm==4.67.1
