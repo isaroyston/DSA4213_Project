@@ -5,6 +5,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 import os
+import string
 
 # Load environment variables
 load_dotenv()
@@ -32,17 +33,27 @@ print(f"\nLabel: {newsgroups_train.target_names[newsgroups_train.target[0]]}")
 
 print("CLEANING DATA")
 
+import string
+
 def clean_text(text):
-    """Remove headers, quotes, emails, URLs, and clean whitespace"""
+    """Remove headers, quotes, emails, URLs, punctuation, and clean whitespace"""
+    # Remove headers (take only body after first blank line)
     if '\n\n' in text:
         text = text.split('\n\n', 1)[1]
+    # Remove quoted lines (starting with > or :)
     lines = text.split('\n')
     lines = [line for line in lines if not line.startswith('>') and not line.startswith(':')]
     text = '\n'.join(lines)
+    # Remove emails
     text = re.sub(r'\S+@\S+', '', text)
+    # Remove URLs
     text = re.sub(r'http\S+|www\.\S+', '', text)
+    # Remove punctuation
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    # Normalize whitespace
     text = re.sub(r'\s+', ' ', text).strip()
     return text
+
 
 # Clean training data
 print("Cleaning training set")
@@ -87,11 +98,11 @@ print("\n Saved cleaned train set to 'newsgroups_train_clean.csv'")
 print(" Saved cleaned test set to 'newsgroups_test_clean.csv'")
 
 
-try:
-    conn_str = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-    engine = create_engine(conn_str)
-    df_train.to_sql("newsgroups_train", engine, if_exists="replace", index=False)
-    df_test.to_sql("newsgroups_test", engine, if_exists="replace", index=False)
-    print("\n Saved cleaned datasets into PostgreSQL")
-except Exception as e:
-    print("\n[ERROR] Could not save to PostgreSQL:", e)
+# try:
+#     conn_str = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+#     engine = create_engine(conn_str)
+#     df_train.to_sql("newsgroups_train", engine, if_exists="replace", index=False)
+#     df_test.to_sql("newsgroups_test", engine, if_exists="replace", index=False)
+#     print("\n Saved cleaned datasets into PostgreSQL")
+# except Exception as e:
+#     print("\n[ERROR] Could not save to PostgreSQL:", e)
