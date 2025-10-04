@@ -2,6 +2,17 @@ from sklearn.datasets import fetch_20newsgroups
 from pprint import pprint
 import re
 import pandas as pd
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
 
 print("Loading 20 Newsgroups dataset")
 newsgroups_train = fetch_20newsgroups(subset='train')
@@ -23,24 +34,14 @@ print("CLEANING DATA")
 
 def clean_text(text):
     """Remove headers, quotes, emails, URLs, and clean whitespace"""
-    # Remove email headers (everything before first blank line)
     if '\n\n' in text:
         text = text.split('\n\n', 1)[1]
-    
-    # Remove quoted text (lines starting with > or :)
     lines = text.split('\n')
     lines = [line for line in lines if not line.startswith('>') and not line.startswith(':')]
     text = '\n'.join(lines)
-    
-    # Remove email addresses
     text = re.sub(r'\S+@\S+', '', text)
-    
-    # Remove URLs
     text = re.sub(r'http\S+|www\.\S+', '', text)
-    
-    # Remove extra whitespace
     text = re.sub(r'\s+', ' ', text).strip()
-    
     return text
 
 # Clean training data
@@ -84,3 +85,13 @@ df_test.to_csv("newsgroups_test_clean.csv", index=False)
 
 print("\n Saved cleaned train set to 'newsgroups_train_clean.csv'")
 print(" Saved cleaned test set to 'newsgroups_test_clean.csv'")
+
+
+try:
+    conn_str = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    engine = create_engine(conn_str)
+    df_train.to_sql("newsgroups_train", engine, if_exists="replace", index=False)
+    df_test.to_sql("newsgroups_test", engine, if_exists="replace", index=False)
+    print("\n ✓ Saved cleaned datasets into PostgreSQL")
+except Exception as e:
+    print("\n[ERROR] Could not save to PostgreSQL:", e)
