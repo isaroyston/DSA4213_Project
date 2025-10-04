@@ -1,0 +1,91 @@
+from sklearn.datasets import fetch_20newsgroups
+from pprint import pprint
+import re
+import pandas as pd
+
+# ============= LOAD FULL DATASET =============
+print("Loading 20 Newsgroups dataset...")
+newsgroups_train = fetch_20newsgroups(subset='train')
+newsgroups_test = fetch_20newsgroups(subset='test')
+
+print("\n--- Dataset Structure ---")
+print(f"Categories ({len(newsgroups_train.target_names)}):")
+pprint(newsgroups_train.target_names)
+print(f"\nTrain documents: {len(newsgroups_train.data)}")
+print(f"Test documents: {len(newsgroups_test.data)}")
+
+# ============= EXPLORATION =============
+print("\n--- Sample Document (Before Cleaning) ---")
+print(newsgroups_train.data[0][:400])
+print(f"\nLabel: {newsgroups_train.target_names[newsgroups_train.target[0]]}")
+
+# ============= DATA CLEANING =============
+print("\n" + "="*60)
+print("CLEANING DATA")
+print("="*60)
+
+def clean_text(text):
+    """Remove headers, quotes, emails, URLs, and clean whitespace"""
+    # Remove email headers (everything before first blank line)
+    if '\n\n' in text:
+        text = text.split('\n\n', 1)[1]
+    
+    # Remove quoted text (lines starting with > or :)
+    lines = text.split('\n')
+    lines = [line for line in lines if not line.startswith('>') and not line.startswith(':')]
+    text = '\n'.join(lines)
+    
+    # Remove email addresses
+    text = re.sub(r'\S+@\S+', '', text)
+    
+    # Remove URLs
+    text = re.sub(r'http\S+|www\.\S+', '', text)
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
+
+# Clean training data
+print("Cleaning training set...")
+newsgroups_train.data = [clean_text(text) for text in newsgroups_train.data]
+
+# Clean test data
+print("Cleaning test set...")
+newsgroups_test.data = [clean_text(text) for text in newsgroups_test.data]
+
+print(f"\nCleaned {len(newsgroups_train.data)} train documents")
+print(f"Cleaned {len(newsgroups_test.data)} test documents")
+
+# ============= VERIFY CLEANING =============
+print("\n--- Sample Document (After Cleaning) ---")
+print(newsgroups_train.data[0][:400])
+
+# Check cleaning effectiveness
+avg_len_before = sum(len(text) for text in fetch_20newsgroups(subset='train').data) / len(newsgroups_train.data)
+avg_len_after = sum(len(text) for text in newsgroups_train.data) / len(newsgroups_train.data)
+print(f"\nAvg document length: {avg_len_before:.0f} → {avg_len_after:.0f} chars")
+print(f"Reduction: {(1 - avg_len_after/avg_len_before)*100:.1f}%")
+
+# ============= SAVE CLEANED DATA TO CSV =============
+
+# Training set
+df_train = pd.DataFrame({
+    "text": newsgroups_train.data,
+    "label_id": newsgroups_train.target,
+    "label": [newsgroups_train.target_names[i] for i in newsgroups_train.target]
+})
+
+# Test set
+df_test = pd.DataFrame({
+    "text": newsgroups_test.data,
+    "label_id": newsgroups_test.target,
+    "label": [newsgroups_test.target_names[i] for i in newsgroups_test.target]
+})
+
+# Save CSVs
+df_train.to_csv("newsgroups_train_clean.csv", index=False)
+df_test.to_csv("newsgroups_test_clean.csv", index=False)
+
+print("\n Saved cleaned train set to 'newsgroups_train_clean.csv'")
+print(" Saved cleaned test set to 'newsgroups_test_clean.csv'")
