@@ -1,108 +1,180 @@
-from sklearn.datasets import fetch_20newsgroups
-from pprint import pprint
 import re
+import string
 import pandas as pd
-from sqlalchemy import create_engine
+import spacy
+from nltk.corpus import stopwords
+from sqlalchemy import create_engine, text
+from sqlalchemy.types import Text, Integer
 from dotenv import load_dotenv
 import os
-import string
+from sklearn.datasets import fetch_20newsgroups
 
-# Load environment variables
+# ENVIRONMENT SETUP
 load_dotenv()
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
+DATABASE_URL = os.getenv("DB_URL")
 
-print("Loading 20 Newsgroups dataset")
-newsgroups_train = fetch_20newsgroups(subset='train')
-newsgroups_test = fetch_20newsgroups(subset='test')
+# GLOBALS
+STOPWORDS = set(stopwords.words("english"))
+NLP = spacy.load("en_core_web_sm", disable=["ner", "parser"])
 
-print("\n Dataset Structure")
-print(f"Categories ({len(newsgroups_train.target_names)}):")
-pprint(newsgroups_train.target_names)
-print(f"\nTrain documents: {len(newsgroups_train.data)}")
-print(f"Test documents: {len(newsgroups_test.data)}")
-
-
-print("\n Exploring Dataset (Before Cleaning)")
-print(newsgroups_train.data[0][:400])
-print(f"\nLabel: {newsgroups_train.target_names[newsgroups_train.target[0]]}")
-
-
-print("CLEANING DATA")
-
-import string
-
-def clean_text(text):
-    """Remove headers, quotes, emails, URLs, punctuation, and clean whitespace"""
+# BASIC CLEANING
+def clean_text_basic(text):
+    """
+    Perform baseline text cleaning suitable for all NLP pipelines.
+    Steps:
+    - Remove headers, quoted lines, emails, URLs, punctuation
+    - Normalize whitespace and lowercase
+    """
     # Remove headers (take only body after first blank line)
-    if '\n\n' in text:
-        text = text.split('\n\n', 1)[1]
-    # Remove quoted lines (starting with > or :)
-    lines = text.split('\n')
-    lines = [line for line in lines if not line.startswith('>') and not line.startswith(':')]
-    text = '\n'.join(lines)
-    # Remove emails
-    text = re.sub(r'\S+@\S+', '', text)
-    # Remove URLs
-    text = re.sub(r'http\S+|www\.\S+', '', text)
+    if "\n\n" in text:
+        text = text.split("\n\n", 1)[1]
+    # Remove quoted lines starting with > or :
+    lines = text.split("\n")
+    lines = [line for line in lines if not line.startswith(">") and not line.startswith(":")]
+    text = "\n".join(lines)
+    # Remove emails and URLs
+    text = re.sub(r"\S+@\S+", "", text)
+    text = re.sub(r"http\S+|www\.\S+", "", text)
     # Remove punctuation
-    text = text.translate(str.maketrans('', '', string.punctuation))
-    # Normalize whitespace
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    # Normalize whitespace and lowercase
+    text = re.sub(r"\s+", " ", text).strip().lower()
     return text
 
+def filter_short_docs(df, min_length=50):
+    """Drop documents shorter than `min_length` characters."""
+    before = len(df)
+    df = df[df["text"].str.len() > min_length]
+    dropped = before - len(df)
+    print(f"Filtered {dropped} short docs ({dropped} dropped, {len(df)} kept).")
+    return df
 
-# Clean training data
-print("Cleaning training set")
-newsgroups_train.data = [clean_text(text) for text in newsgroups_train.data]
+# ADDITIONAL CLEANING VARIANTS FOR SPARSE REPRESENTATION CLEANING
+def lemmatize_text(text):
+    """Lemmatize tokens using SpaCy."""
+    doc = NLP(text)
+    return " ".join([token.lemma_ for token in doc if not token.is_punct])
 
-# Clean test data
-print("Cleaning test set")
-newsgroups_test.data = [clean_text(text) for text in newsgroups_test.data]
+def clean_for_sparse_repr(text, lemmatize=True):
+    """
+    Cleaning variant for sparse vector representations
+    (TF-IDF, bag-of-words, LDA, NMF, etc.)
+    - Removes stopwords
+    - Optional lemmatization
+    Suitable for non-contextual text models.
+    """
+    text = clean_text_basic(text)
+    text = " ".join([w for w in text.split() if w not in STOPWORDS])
+    if lemmatize:
+        text = lemmatize_text(text)
+    return text
 
-print(f"\nCleaned {len(newsgroups_train.data)} train documents")
-print(f"Cleaned {len(newsgroups_test.data)} test documents")
+# ABLATION UTILITIES FOR TOKEN LIMIT HANDLING
+def truncate_text(text, max_words=512, position="start"):
+    """
+    Truncate text to simulate limited-context models.
+    position = 'start' (keep first N words) or 'end' (keep last N words).
+    """
+    words = text.split()
+    if len(words) <= max_words:
+        return text
+    return " ".join(words[:max_words]) if position == "start" else " ".join(words[-max_words:])
 
-print("\n Sample Document (After Cleaning)")
-print(newsgroups_train.data[0][:400])
+def sliding_window_segments(text, window_size=512, stride=256):
+    """
+    Create overlapping text segments for long-text ablation experiments.
+    Returns a list of segments.
+    """
+    words = text.split()
+    segments = []
+    for i in range(0, len(words), stride):
+        segment = " ".join(words[i : i + window_size])
+        if len(segment.split()) < 10:
+            break
+        segments.append(segment)
+    return segments
 
-# Check cleaning effectiveness
-avg_len_before = sum(len(text) for text in fetch_20newsgroups(subset='train').data) / len(newsgroups_train.data)
-avg_len_after = sum(len(text) for text in newsgroups_train.data) / len(newsgroups_train.data)
-print(f"\nAvg document length: {avg_len_before:.0f} → {avg_len_after:.0f} chars")
-print(f"Reduction: {(1 - avg_len_after/avg_len_before)*100:.1f}%")
+# MAIN CLEANING PIPELINE
+def prepare_cleaned_datasets():
+    """Load, clean, and save the base cleaned 20 Newsgroups dataset."""
+
+    print("Loading 20 Newsgroups dataset...")
+    train = fetch_20newsgroups(subset="train")
+    test = fetch_20newsgroups(subset="test")
+
+    print("Applying basic cleaning...")
+    df_train = pd.DataFrame(
+        {
+            "text": [clean_text_basic(t) for t in train.data],
+            "label_id": train.target,
+            "label": [train.target_names[i] for i in train.target],
+        }
+    )
+    df_test = pd.DataFrame(
+        {
+            "text": [clean_text_basic(t) for t in test.data],
+            "label_id": test.target,
+            "label": [test.target_names[i] for i in test.target],
+        }
+    )
+
+    # Filter out short docs
+    df_train = filter_short_docs(df_train)
+    df_test = filter_short_docs(df_test)
+
+    # Save base cleaned versions locally
+    df_train.to_csv("newsgroups_train_clean_basic.csv", index=False)
+    df_test.to_csv("newsgroups_test_clean_basic.csv", index=False)
+    print("Saved base cleaned CSVs locally.")
+
+    return df_train, df_test
+
+# SAVE ALL VARIANTS TO POSTGRESQL
+def save_all_variants_to_postgres(df_train, df_test, engine):
+    """
+    Save two cleaned dataset variants:
+    - basic (for dense embeddings & LLMs)
+    - sparse_repr (for TF-IDF / LDA ablation)
+    """
+    with engine.connect() as conn:
+        conn.execute(text("CREATE SCHEMA IF NOT EXISTS newsgroup"))
+
+    variants = {
+        "basic": (df_train, df_test),
+        "sparse_repr": (
+            df_train.assign(text=df_train["text"].apply(clean_for_sparse_repr)),
+            df_test.assign(text=df_test["text"].apply(clean_for_sparse_repr)),
+        )
+    }
+
+    for variant, (train_df, test_df) in variants.items():
+        print(f"Uploading {variant} variant to PostgreSQL...")
+        train_df.to_sql(
+            f"train_{variant}",
+            engine,
+            schema="newsgroup",
+            if_exists="replace",
+            index=False,
+            dtype={"text": Text(), "label_id": Integer(), "label": Text()},
+        )
+        test_df.to_sql(
+            f"test_{variant}",
+            engine,
+            schema="newsgroup",
+            if_exists="replace",
+            index=False,
+            dtype={"text": Text(), "label_id": Integer(), "label": Text()},
+        )
+
+    print("\n All cleaned dataset variants successfully uploaded to PostgreSQL.")
 
 
-# Training set
-df_train = pd.DataFrame({
-    "text": newsgroups_train.data,
-    "label_id": newsgroups_train.target,
-    "label": [newsgroups_train.target_names[i] for i in newsgroups_train.target]
-})
-
-# Test set
-df_test = pd.DataFrame({
-    "text": newsgroups_test.data,
-    "label_id": newsgroups_test.target,
-    "label": [newsgroups_test.target_names[i] for i in newsgroups_test.target]
-})
-
-# Save CSVs
-df_train.to_csv("newsgroups_train_clean.csv", index=False)
-df_test.to_csv("newsgroups_test_clean.csv", index=False)
-
-print("\n Saved cleaned train set to 'newsgroups_train_clean.csv'")
-print(" Saved cleaned test set to 'newsgroups_test_clean.csv'")
-
-
-# try:
-#     conn_str = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-#     engine = create_engine(conn_str)
-#     df_train.to_sql("newsgroups_train", engine, if_exists="replace", index=False)
-#     df_test.to_sql("newsgroups_test", engine, if_exists="replace", index=False)
-#     print("\n Saved cleaned datasets into PostgreSQL")
-# except Exception as e:
-#     print("\n[ERROR] Could not save to PostgreSQL:", e)
+# ENTRY POINT
+if __name__ == "__main__":
+    df_train, df_test = prepare_cleaned_datasets()
+    try:
+        print("\nConnecting to PostgreSQL...")
+        engine = create_engine(DATABASE_URL)
+        save_all_variants_to_postgres(df_train, df_test, engine)
+    except Exception as e:
+        print("\n[ERROR] Could not save to PostgreSQL:", e)
