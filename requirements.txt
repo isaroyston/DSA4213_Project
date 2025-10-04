@@ -1,1 +1,2 @@
 bertopic[full]\nscikit-learn\npandas
+scikit-learn>=1.3.0
