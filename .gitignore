@@ -3,31 +3,31 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Data files
-
-
-finetuned_models_output/
+# Model checkpoints, temporary outputs, etc.
+finetuned_models/
+embeddings_output/
 checkpoints/
 *.pt
 *.bin
-*.csv
-!finetuned_models_output/*_final.csv
 
+# Intermediate / final CSV or large output files
+*.csv
+*.npz
 
 # Jupyter Notebook checkpoints
-.ipynb_checkpoints
+.ipynb_checkpoints/
 
 # Distribution / packaging
 build/
 dist/
 *.egg-info/
 
-# Environments
+# Virtual environments / environment files
 .env
-.venv
+.venv/
 env/
 venv/
 ENV/
 
-# VSCode settings
+# VSCode / editor settings
 .vscode/
