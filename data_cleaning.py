@@ -136,7 +136,7 @@ def save_all_variants_to_postgres(df_train, df_test, engine):
     - basic (for dense embeddings & LLMs)
     - sparse_repr (for TF-IDF / LDA ablation)
     """
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS newsgroup"))
 
     variants = {
