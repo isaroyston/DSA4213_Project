@@ -4,7 +4,15 @@ __pycache__/
 *$py.class
 
 # Data files
+
+
+finetuned_models_output/
+checkpoints/
+*.pt
+*.bin
 *.csv
+!finetuned_models_output/*_final.csv
+
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints
