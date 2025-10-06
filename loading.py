@@ -3,25 +3,22 @@ import pandas as pd
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
-# Get variables
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_NAME")
+# Get database URL
+DATABASE_URL = os.getenv("DB_URL")
 
-# Create connection string
-conn_str = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-engine = create_engine(conn_str)
+# Ensure SSL mode for Render
+if "?sslmode=require" not in DATABASE_URL:
+    DATABASE_URL += "?sslmode=require"
 
-# Read train data
-df_train = pd.read_sql("SELECT * FROM newsgroups_train", engine)
+# Create SQLAlchemy engine
+engine = create_engine(DATABASE_URL)
 
-# Read test data
-df_test = pd.read_sql("SELECT * FROM newsgroups_test", engine)
+# Load datasets from the "newsgroup" schema
+df_train = pd.read_sql("SELECT * FROM newsgroup.train_basic", engine) #train_sparse_repr
+df_test = pd.read_sql("SELECT * FROM newsgroup.test_basic", engine) #test_sparse_repr
 
 print(f"Loaded {len(df_train)} train docs and {len(df_test)} test docs")
 print(df_train.head())
