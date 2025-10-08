@@ -15,7 +15,7 @@ Model 3: Fine-Tuned Embeddings + Embedding Saving (Test Set Only)
 
 This script fine-tunes MiniLM embeddings on the news dataset using three contrastive
 losses (Triplet, SimCSE, Cosine). After each model is trained, it generates embeddings
-for the test set, and saves them. 
+for the test set, and saves them.
 
 Outputs:
 finetuned_models
@@ -50,11 +50,13 @@ embeddings_root = "embeddings_output"
 os.makedirs(embeddings_root, exist_ok=True)
 
 # Example creators
+
 def create_triplet_examples(df, n_samples=500):
     examples = []
     labels = df['label'].unique()
     print(f"Creating {n_samples} triplet examples")
-    for _ in tqdm(range(n_samples)):
+    pbar = tqdm(total=n_samples, desc="Triplets")
+    while len(examples) < n_samples:
         anchor_label = np.random.choice(labels)
         anchor_df = df[df['label'] == anchor_label]
         if len(anchor_df) < 2:
@@ -63,19 +65,14 @@ def create_triplet_examples(df, n_samples=500):
         negative_label = np.random.choice([l for l in labels if l != anchor_label])
         negative_text = df[df['label'] == negative_label].sample(1)['text'].values[0]
         examples.append(InputExample(texts=[anchor_text, positive_text, negative_text]))
+        pbar.update(1)
+    pbar.close()
     return examples
 
 def create_simcse_examples(df, n_samples=500):
-    examples = []
-    print(f"Creating {n_samples} SimCSE examples")
-    for label in tqdm(df['label'].unique()):
-        label_df = df[df['label'] == label]
-        if len(label_df) < 2:
-            continue
-        n_pairs = min(n_samples // df['label'].nunique(), len(label_df) // 2)
-        for _ in range(n_pairs):
-            texts = label_df.sample(2)['text'].values
-            examples.append(InputExample(texts=[texts[0], texts[1]]))
+    print(f"Creating {n_samples} SimCSE examples (duplicate texts for dropout views)")
+    texts = df['text'].sample(n=min(n_samples, len(df)), replace=len(df) < n_samples).tolist()
+    examples = [InputExample(texts=[t, t]) for t in texts]
     return examples
 
 def create_cosine_examples(df, n_samples=500):
@@ -83,14 +80,20 @@ def create_cosine_examples(df, n_samples=500):
     labels = df['label'].unique()
     print(f"Creating {n_samples} cosine similarity examples")
     half = n_samples // 2
-    for _ in tqdm(range(half), desc="Positive pairs"):
+    
+    pbar = tqdm(total=half, desc="Positive pairs")
+    while len([e for e in examples if e.label == 1.0]) < half:
         anchor_label = np.random.choice(labels)
         anchor_df = df[df['label'] == anchor_label]
         if len(anchor_df) < 2:
             continue
         pos_texts = anchor_df.sample(2)['text'].values
         examples.append(InputExample(texts=[pos_texts[0], pos_texts[1]], label=1.0))
-    for _ in tqdm(range(half), desc="Negative pairs"):
+        pbar.update(1)
+    pbar.close()
+    
+    pbar = tqdm(total=half, desc="Negative pairs")
+    while len([e for e in examples if e.label == 0.0]) < half:
         anchor_label = np.random.choice(labels)
         anchor_df = df[df['label'] == anchor_label]
         if len(anchor_df) < 1:
@@ -99,9 +102,14 @@ def create_cosine_examples(df, n_samples=500):
         neg_label = np.random.choice([l for l in labels if l != anchor_label])
         neg_text = df[df['label'] == neg_label].sample(1)['text'].values[0]
         examples.append(InputExample(texts=[anchor_text, neg_text], label=0.0))
+        pbar.update(1)
+    pbar.close()
+    
     return examples
 
-# Embedding saver (only test set)
+# save embeddings (only test set)
+
+
 def save_test_embeddings(model: SentenceTransformer, name: str):
     texts = df_test["text"].tolist()
     labels = df_test["label"].tolist()
@@ -123,29 +131,67 @@ def save_test_embeddings(model: SentenceTransformer, name: str):
     print("Saved embeddings:", embeddings.shape)
     return out_path
 
-# Function to train + test-embed
-def train_and_embed_test(approach_name, example_creator, loss_class):
+
+# Training func
+
+
+def train_and_embed_test(approach_name, example_creator, loss_class,
+                         n_samples=1000, batch_size=32, epochs=3, warmup_ratio=0.1):
     print("\nApproach:", approach_name)
-    examples = example_creator(df_train, n_samples=1000)
-    loader = DataLoader(examples, shuffle=True, batch_size=16)
+    examples = example_creator(df_train, n_samples=n_samples)
+    print(f"Created {len(examples)} examples")
+    if len(examples) < batch_size:
+        batch_size = max(2, len(examples))
+        print(f"[Info] Adjusted batch_size to {batch_size} due to small dataset.")
+    loader = DataLoader(examples, shuffle=True, batch_size=batch_size, drop_last=True)
     model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
     loss = loss_class(model)
     model_path = os.path.join(model_root, approach_name)
+    total_steps = len(loader) * epochs
+    warmup_steps = max(1, int(total_steps * warmup_ratio))  
     model.fit(
         train_objectives=[(loader, loss)],
-        epochs=3,
-        warmup_steps=100,
+        epochs=epochs,
+        warmup_steps=warmup_steps,
         output_path=model_path,
         show_progress_bar=True
     )
     print(f"Model saved to: {model_path}")
-    # Only embed test set, not training
     emb_path = save_test_embeddings(model, approach_name)
     return model_path, emb_path
 
+
 # Run for each approach
-train_and_embed_test("triplet", create_triplet_examples, losses.TripletLoss)
-train_and_embed_test("simcse", create_simcse_examples, losses.MultipleNegativesRankingLoss)
-train_and_embed_test("cosine", create_cosine_examples, losses.CosineSimilarityLoss)
+
+
+# Triplet
+train_and_embed_test(
+    "triplet",
+    create_triplet_examples,
+    losses.TripletLoss,
+    n_samples=1000,
+    batch_size=32,
+    epochs=3
+)
+
+# SimCSE
+train_and_embed_test(
+    "simcse",
+    create_simcse_examples,
+    losses.MultipleNegativesRankingLoss,
+    n_samples=1000,
+    batch_size=32,
+    epochs=3
+)
+
+# Cosine
+train_and_embed_test(
+    "cosine",
+    create_cosine_examples,
+    losses.CosineSimilarityLoss,
+    n_samples=1000,
+    batch_size=32,
+    epochs=3
+)
 
 print("\nModels + test embeddings saved.")
