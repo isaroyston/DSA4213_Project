@@ -9,7 +9,7 @@ trl==0.23.1
 sentence_transformers==5.1.1
 umap-learn==0.5.9.post2
 hdbscan==0.8.40
-torch==2.8.0
+torch==2.5.1
 bertopic==0.17.3
 
 # LLM Integration
