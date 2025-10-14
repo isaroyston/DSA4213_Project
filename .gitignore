@@ -13,6 +13,7 @@ checkpoints/
 # Intermediate / final CSV or large output files
 *.csv
 *.npz
+*.png
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
