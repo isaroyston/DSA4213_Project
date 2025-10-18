@@ -1,5 +1,6 @@
 # on  2d embeddings
 
+
 from typing import List, Union, Optional
 import numpy as np
 from sklearn.metrics import davies_bouldin_score, f1_score, confusion_matrix
@@ -123,3 +124,78 @@ if __name__ == "__main__":
 
 
 
+
+
+# on the normal embeddings
+
+# import argparse
+# import os
+# import sys
+# import numpy as np
+# from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score
+
+
+# def l2_normalize(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+#     n = np.linalg.norm(x, axis=1, keepdims=True)
+#     return x / np.maximum(n, eps)
+
+
+# def compute_metrics(embeddings: np.ndarray, labels) -> dict:
+#     """
+#     Compute DBI (lower is better) and CH (higher is better)
+#     on L2-normalized embeddings.
+#     """
+#     if embeddings.ndim != 2:
+#         raise ValueError(f"Expected embeddings with shape (n, d); got {embeddings.shape}")
+#     if len(embeddings) != len(labels):
+#         raise ValueError(f"{len(embeddings)} embeddings but {len(labels)} labels")
+
+#     # Normalize before Euclidean metrics (good for cosine-trained encoders)
+#     E = l2_normalize(embeddings)
+
+#     # sklearn accepts string labels, so we pass them directly
+#     dbi = davies_bouldin_score(E, labels)
+#     ch = calinski_harabasz_score(E, labels)
+#     return {"dbi": float(dbi), "ch": float(ch)}
+
+
+# def load_npz(path: str):
+#     data = np.load(path, allow_pickle=True)
+#     if "embeddings" not in data or "labels" not in data:
+#         raise KeyError(f"{path} must contain 'embeddings' and 'labels'")
+#     return data["embeddings"], data["labels"]
+
+
+# def main():
+#     p = argparse.ArgumentParser(description="Compute DBI/CH from NPZ using normal labels")
+#     p.add_argument("files", nargs="+", help="Path(s) to *_embeddings.npz")
+#     p.add_argument("--out", default=None, help="Optional path to save a CSV summary")
+#     args = p.parse_args()
+
+#     rows = []
+#     print("=" * 72)
+#     print("DBI/CH on full-dimension embeddings (labels = NPZ 'labels')")
+#     print("=" * 72)
+
+#     for f in args.files:
+#         try:
+#             E, y = load_npz(f)
+#             m = compute_metrics(E, y)
+#             name = os.path.splitext(os.path.basename(f))[0]
+#             print(f"{name:35s}  DBI: {m['dbi']:.4f}   CH: {m['ch']:.2f}   n={len(E)}  d={E.shape[1]}")
+#             rows.append({"file": f, "dbi": m["dbi"], "ch": m["ch"], "n": len(E), "d": E.shape[1]})
+#         except Exception as e:
+#             print(f"[ERROR] {f}: {e}", file=sys.stderr)
+
+#     if args.out and rows:
+#         # Minimal CSV writer without pandas dependency
+#         import csv
+#         with open(args.out, "w", newline="", encoding="utf-8") as fp:
+#             w = csv.DictWriter(fp, fieldnames=["file", "dbi", "ch", "n", "d"])
+#             w.writeheader()
+#             w.writerows(rows)
+#         print(f"\nSummary written to {args.out}")
+
+
+# if __name__ == "__main__":
+#     main()
