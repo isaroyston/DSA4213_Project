@@ -16,6 +16,41 @@ DATABASE_URL = os.getenv("DB_URL")
 # GLOBALS
 STOPWORDS = set(stopwords.words("english"))
 NLP = spacy.load("en_core_web_sm", disable=["ner", "parser"])
+CATEGORY_MAP_INT = {
+    # 1. Computers & Technology
+    "comp.graphics": 1,
+    "comp.os.ms-windows.misc": 1,
+    "comp.sys.ibm.pc.hardware": 1,
+    "comp.sys.mac.hardware": 1,
+    "comp.windows.x": 1,
+
+    # 2. Science & Engineering
+    "sci.crypt": 2,
+    "sci.electronics": 2,
+    "sci.med": 2,
+    "sci.space": 2,
+
+    # 3. Recreation (Vehicles & Hobbies)
+    "rec.autos": 3,
+    "rec.motorcycles": 3,
+
+    # 4. Sports
+    "rec.sport.baseball": 4,
+    "rec.sport.hockey": 4,
+
+    # 5. Religion
+    "alt.atheism": 5,
+    "soc.religion.christian": 5,
+    "talk.religion.misc": 5,
+
+    # 6. Politics & Society
+    "talk.politics.guns": 6,
+    "talk.politics.mideast": 6,
+    "talk.politics.misc": 6,
+
+    # 7. Marketplace / Miscellaneous
+    "misc.forsale": 7
+}
 
 # BASIC CLEANING
 def clean_text_basic(text):
@@ -94,6 +129,13 @@ def sliding_window_segments(text, window_size=512, stride=256):
         segments.append(segment)
     return segments
 
+# MAPPING OF NEWS CATEGORIES TO BROADER ONES
+def add_broad_category_int(df):
+    """Map fine-grained labels to integer IDs (1–7)."""
+    df = df.copy()
+    df["broad_label_id"] = df["label"].map(CATEGORY_MAP_INT)
+    return df
+
 # MAIN CLEANING PIPELINE
 def prepare_cleaned_datasets():
     """Load, clean, and save the base cleaned 20 Newsgroups dataset."""
@@ -132,9 +174,12 @@ def prepare_cleaned_datasets():
 # SAVE ALL VARIANTS TO POSTGRESQL
 def save_all_variants_to_postgres(df_train, df_test, engine):
     """
-    Save two cleaned dataset variants:
+    Save three dataset variants:
     - basic (for dense embeddings & LLMs)
     - sparse_repr (for TF-IDF / LDA ablation)
+    - broad_category (with integer broad_label_id mapping, 1-7)
+
+    Ensures no duplicate inserts across reruns by truncating existing tables.
     """
     with engine.begin() as conn:
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS newsgroup"))
@@ -144,30 +189,68 @@ def save_all_variants_to_postgres(df_train, df_test, engine):
         "sparse_repr": (
             df_train.assign(text=df_train["text"].apply(clean_for_sparse_repr)),
             df_test.assign(text=df_test["text"].apply(clean_for_sparse_repr)),
+        ),
+        "broad_category": (
+            add_broad_category_int(df_train),
+            add_broad_category_int(df_test),
         )
     }
 
     for variant, (train_df, test_df) in variants.items():
         print(f"Uploading {variant} variant to PostgreSQL...")
+
+        with engine.begin() as conn:
+            # Ensure table exists
+            conn.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS newsgroup.train_{variant} (
+                    text TEXT,
+                    label_id INTEGER,
+                    label TEXT,
+                    broad_label_id INTEGER
+                );
+            """))
+            conn.execute(text(f"""
+                CREATE TABLE IF NOT EXISTS newsgroup.test_{variant} (
+                    text TEXT,
+                    label_id INTEGER,
+                    label TEXT,
+                    broad_label_id INTEGER
+                );
+            """))
+
+            # Truncate existing rows to avoid duplicates
+            conn.execute(text(f"TRUNCATE TABLE newsgroup.train_{variant};"))
+            conn.execute(text(f"TRUNCATE TABLE newsgroup.test_{variant};"))
+
+        # Insert fresh data
         train_df.to_sql(
             f"train_{variant}",
             engine,
             schema="newsgroup",
-            if_exists="replace",
+            if_exists="append",
             index=False,
-            dtype={"text": Text(), "label_id": Integer(), "label": Text()},
+            dtype={
+                "text": Text(),
+                "label_id": Integer(),
+                "label": Text(),
+                "broad_label_id": Integer()
+            },
         )
         test_df.to_sql(
             f"test_{variant}",
             engine,
             schema="newsgroup",
-            if_exists="replace",
+            if_exists="append",
             index=False,
-            dtype={"text": Text(), "label_id": Integer(), "label": Text()},
+            dtype={
+                "text": Text(),
+                "label_id": Integer(),
+                "label": Text(),
+                "broad_label_id": Integer()
+            },
         )
 
-    print("\n All cleaned dataset variants successfully uploaded to PostgreSQL.")
-
+    print("\nAll dataset variants successfully uploaded to PostgreSQL.")
 
 # ENTRY POINT
 if __name__ == "__main__":
