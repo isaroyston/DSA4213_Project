@@ -181,6 +181,7 @@ def save_test_embeddings(model: SentenceTransformer, name: str):
         show_progress_bar=True,
         batch_size=32,
         convert_to_numpy=True
+        , normalize_embeddings= True
     )
     out_path = os.path.join(embeddings_root, f"{name}_embeddings.npz")
     print(f"Saving test embeddings to: {out_path}")
@@ -263,3 +264,36 @@ train_and_embed_test(
 )
 
 print("\nModels + test embeddings saved.")
+
+
+
+
+# Evaluation (runs automatically after training/embedding)
+
+
+# from src.Evaluations.davies_bouldin import compute_davies_bouldin_index
+# from src.Evaluations.category_alignment import compute_category_alignment, evaluate_from_csv
+
+# #  Davies–Bouldin Index on 2D projections 
+# for model_name in ["triplet", "simcse", "cosine"]:
+#     proj_csv = os.path.join(embeddings_root, f"{model_name}_2d_projection.csv")
+#     if os.path.exists(proj_csv):
+#         df_proj = pd.read_csv(proj_csv)
+#         emb_2d = df_proj[["x", "y"]].values
+#         labels = df_proj["label"].values
+#         compute_davies_bouldin_index(emb_2d, labels, model_name=model_name)
+#     else:
+#         print(f"[Skip] {proj_csv} not found")
+
+# # Category Alignment Evaluation 
+# # Uses ground-truth labels from your test set and predicts that the model
+# # "should match" (identity alignment). This checks class balance & overlap.
+# for model_name in ["triplet", "simcse", "cosine"]:
+#     proj_csv = os.path.join(embeddings_root, f"{model_name}_2d_projection.csv")
+#     if os.path.exists(proj_csv):
+#         df_proj = pd.read_csv(proj_csv)
+#         y_true = df_proj["label"].values
+#         y_pred = df_proj["label"].values  
+#         compute_category_alignment(y_pred, y_true, run_name=model_name, plot_confusion=True)
+#     else:
+#         print(f"[Skip] {proj_csv} not found")
