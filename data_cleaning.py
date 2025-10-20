@@ -12,6 +12,7 @@ from sklearn.datasets import fetch_20newsgroups
 # ENVIRONMENT SETUP
 load_dotenv()
 DATABASE_URL = os.getenv("DB_URL")
+print("\n[INFO] DB_URL =", DATABASE_URL[:5] + "..." if DATABASE_URL else "\n[WARNING] DB_URL not set!")
 
 # GLOBALS
 STOPWORDS = set(stopwords.words("english"))
