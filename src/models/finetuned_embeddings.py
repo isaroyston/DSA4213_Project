@@ -272,7 +272,7 @@ print("\nModels + test embeddings saved.")
 
 
 # from src.Evaluations.davies_bouldin import compute_davies_bouldin_index
-# from src.Evaluations.category_alignment import compute_category_alignment, evaluate_from_csv
+
 
 # #  Davies–Bouldin Index on 2D projections 
 # for model_name in ["triplet", "simcse", "cosine"]:
