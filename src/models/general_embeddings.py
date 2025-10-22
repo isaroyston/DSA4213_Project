@@ -43,9 +43,11 @@ torch.backends.cudnn.benchmark = False
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
 
 # load data
-df_train, df_test = load_data()
+df_train, df_test = load_data(variant="basic")
+df_train_broad, df_test_broad = load_data(variant="broad_category")
 print(f"Loaded train: {len(df_train)} docs, test: {len(df_test)} docs")
-print(f"Number of labels: {df_train['label'].nunique()}")
+print(f"Number of original labels: {df_train['label'].nunique()}")
+print(f"Number of broad labels: {df_train_broad['broad_label_id'].nunique()}")
 
 # directories
 embeddings_root = "embeddings_output"
@@ -114,7 +116,7 @@ def reduce_and_save(embeddings, texts, labels, name, broad_labels=None):
 
 
 # encode and map to umap + save
-def encode_and_save(model: SentenceTransformer, df: pd.DataFrame, name: str, batch_size: int = 32):
+def encode_and_save(model: SentenceTransformer, df: pd.DataFrame, name: str, label_col: str, batch_size: int = 32):
     """
     Encode texts in df with provided model and save artifacts.
 
@@ -128,7 +130,7 @@ def encode_and_save(model: SentenceTransformer, df: pd.DataFrame, name: str, bat
         batch_size: Encode batch size
     """
     texts = df["text"].tolist()
-    labels = df["label"].tolist()
+    labels = df[label_col].tolist() 
 
     print(f"Generating embeddings for split '{name}' with {len(texts)} texts...")
     embeddings = model.encode(
@@ -161,9 +163,15 @@ if __name__ == "__main__":
     print(f"Loading SentenceTransformer model: {model_name}")
     model = SentenceTransformer(model_name)
 
-    # Encode and save for both splits
-    train_path = encode_and_save(model, df_train, name="general_train", batch_size=32)
-    test_path = encode_and_save(model, df_test, name="general_test", batch_size=32)
+    # # Encode and save for both splits (orginal labels)
+    # train_path = encode_and_save(model, df_train, name="general_train", label_col="label", batch_size=32)
+    # test_path = encode_and_save(model, df_test, name="general_test", label_col="label", batch_size=32)
 
-    print("\nGeneral embeddings saved.")
+    # print("\nEmbeddings for original labels saved.")
+
+    # Encode and save for both splits (broad labels)
+    train_path_broad = encode_and_save(model, df_train_broad, name="general_train_broad", label_col="broad_label_id", batch_size=32)
+    test_path_broad = encode_and_save(model, df_test_broad, name="general_test_broad", label_col="broad_label_id", batch_size=32)
+
+    print("\nEmbeddings for broad labels saved.")
 
