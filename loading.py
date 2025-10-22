@@ -3,7 +3,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
-def load_data():
+def load_data(variant):
     """Load training and test datasets from the Render Postgres DB."""
     # Load environment variables
     load_dotenv()
@@ -19,8 +19,8 @@ def load_data():
     engine = create_engine(DATABASE_URL)
 
     # Load datasets from the "newsgroup" schema
-    df_train = pd.read_sql("SELECT * FROM newsgroup.train_basic", engine)
-    df_test = pd.read_sql("SELECT * FROM newsgroup.test_basic", engine)
+    df_train = pd.read_sql(f"SELECT * FROM newsgroup.train_{variant}", engine)
+    df_test = pd.read_sql(f"SELECT * FROM newsgroup.test_{variant}", engine)
 
     print(f"Loaded {len(df_train)} train docs and {len(df_test)} test docs")
     return df_train, df_test
