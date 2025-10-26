@@ -4,6 +4,7 @@ import pandas as pd
 import pickle
 import sys
 import os
+import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD, PCA
 from sklearn.pipeline import make_pipeline
@@ -14,16 +15,8 @@ from umap import UMAP
 # Data loading
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from loading import load_data
-from src.models.model_utils import (
-    build_topic_model,
-    fit_topic_model,
-    transform_topic_model,
-    evaluate_bertopic_results,
-    get_topic_keywords,
-    refine_topics_with_llm
-)
+df_train, df_test = load_data(variant="broad_category")
 
-df_train, df_test = load_data()
 articles_train = df_train['text'].tolist() 
 articles_test = df_test['text'].tolist()
 
@@ -66,6 +59,8 @@ def map_to_2d(embeddings_train, embeddings_test, method='umap', pca_components=5
     
     return embeddings_2d_train, embeddings_2d_test
 
+
+
 def evaluate_embeddings(embeddings):
     """Evaluate embedding quality"""
     n_clusters = min(50, len(embeddings) // 10)
@@ -78,7 +73,6 @@ def evaluate_embeddings(embeddings):
         'n_dimensions': embeddings.shape[1],
         'n_samples': embeddings.shape[0]
     }
-
 
 # EXEC ----------------------------------------
 vectorizer, svd_model, pipeline = build_vectorizer_svd(max_features=10000, n_components=30)
@@ -96,33 +90,18 @@ tfidf_2d_train, tfidf_2d_test = map_to_2d(tfidf_train, tfidf_test, method='umap'
 # Save embeddings
 embeddings_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'embeddings_output')
 os.makedirs(embeddings_dir, exist_ok=True)
-pickle.dump({'train': tfidf_train, 'test': tfidf_test}, open(os.path.join(embeddings_dir, 'tfidf_embeddings.pkl'), 'wb'))
-pickle.dump({'train': tfidf_2d_train, 'test': tfidf_2d_test}, open(os.path.join(embeddings_dir, 'tfidf_2d_embeddings.pkl'), 'wb'))
+np.savez(
+    os.path.join(embeddings_dir, 'tfidf_embeddings.npz'),
+    train=tfidf_train,
+    test=tfidf_test
+)
+np.savez(
+    os.path.join(embeddings_dir, 'tfidf_2d_embeddings.npz'),
+    train=tfidf_2d_train,
+    test=tfidf_2d_test
+)
 print(f"✓ Embeddings saved to {embeddings_dir}")
 
-# BERTopic clustering
-print("\nBuilding BERTopic model...")
-topic_model = build_topic_model(vectorizer=vectorizer)
-topics_train, probs_train = fit_topic_model(topic_model, articles_train, tfidf_train)
-topics_test, probs_test = transform_topic_model(topic_model, articles_test, tfidf_test)
-
-print("\n=== BERTopic Results ===")
-bertopic_metrics = evaluate_bertopic_results(topics_train, topics_test)
-for metric, value in bertopic_metrics.items():
-    if isinstance(value, float):
-        print(f"{metric}: {value:.4f}")
-    else:
-        print(f"{metric}: {value}")
-
-#topic_info = topic_keywords(topic_model, n_words=10)
-#print(f"\nDiscovered {len(topic_info)} topics")
-#print(topic_info[['Topic', 'Count', 'Representation']].head(10))
-
-#refined_topics_df = refine_topic_llm(topic_info)
-#print("\n=== Refined Topics (Sample) ===")
-#print(refined_topics_df.head(10))
-
-#refined_topics_df = refine_topic_llm(topic_info)
 
 
 
