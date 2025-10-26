@@ -26,7 +26,18 @@ print("GEMINI_API_KEY:", api_key[:6], "..." if api_key else "MISSING")
 
 # -------- Pydantic schema --------
 class TopicLabel(BaseModel):
-    tuned_topic_name: Literal[""] = Field(..., description="One of 20 predefined Title Case topic labels"),
+    tuned_topic_name: Literal[
+        "Computers & Technology",
+        "Science & Engineering",
+        "Recreation (Vehicles & Hobbies)",
+        "Sports",
+        "Religion",
+        "Politics & Society",
+        "Marketplace / Miscellaneous"
+    ] = Field(
+        ...,
+        description="One of the predefined Title Case topic labels."
+    ), 
     short_explanation: str = Field(..., description="1–2 sentence summary of the cluster theme")
 
 # -------- helpers --------
@@ -59,7 +70,8 @@ def make_prompt_for_topic(keywords: List[str], rep_docs: List[str]) -> str:
             You are a News Analytics assistant analyzing article clusters.
             Produce a concise, meaningful topic label and a short explanation.
             Given that we want to classify the clusters accurately, into the most relevant and specific topics possible, these are some guidelines to follow:
-            - Only cluster topics into these categories: Politics, Health, Technology, Environment, Business, Entertainment, Sports, Science, World News, Lifestyle, Others.
+            - Only cluster topics into these categories: "Computers & Technology", "Science & Engineering", "Recreation (Vehicles & Hobbies)", "Sports", "Religion", "Politics & Society", "Marketplace / Miscellaneous"
+            - Avoid generic or vague labels; be as specific as possible within the allowed categories.
             - Ensure the topic label reflects the main theme of the keywords and representative documents.
             - If you are unsure, you are allowed to cluster it as Others
 
