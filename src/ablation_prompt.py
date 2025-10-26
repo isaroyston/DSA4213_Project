@@ -50,7 +50,7 @@ def _as_list(x) -> List[str]:
         return [t.strip() for t in s.split("|") if t.strip()]
     return [s]
 
-# -------- PROMPT VARIATIONS --------
+
 PROMPT_VARIATIONS = {
     "baseline": lambda keywords, rep_docs: f"""
 You are a News Analytics assistant analyzing article clusters.
@@ -221,31 +221,15 @@ def run_ablation_study(
     test_df: pd.DataFrame,
     topic_model,
     api_key: str,
-    eval_function,  
+    eval_function,
     output_dir: str = "ablation_results",
     prompts_to_test: List[str] = None,
     wait_time_sec: int = 60,
-    num_batches: int = 2
+    num_batches: int = 2,
+    id_col: str = "Doc_ID"  # configurable identifier
 ):
     """
     Run ablation study across different prompts.
-    
-    Args:
-        topic_info: DataFrame with Topic, Representation, Representative_Docs
-        train_df: Training data with embeddings and labels
-        test_df: Test data with embeddings and labels
-        topic_model: Fitted BERTopic model
-        api_key: Gemini API key
-        eval_function: Your compute_category_alignment function
-        output_dir: Directory to save results
-        prompts_to_test: List of prompt names to test (None = all)
-        wait_time_sec: Seconds to wait between batches
-        num_batches: Number of batches to split topic labeling
-        
-    Returns:
-        tuple: (results_list, summary_dataframe)
-            - results_list: List of dicts with detailed results per prompt
-            - summary_dataframe: DataFrame comparing all prompts
     """
     os.makedirs(output_dir, exist_ok=True)
     
@@ -254,20 +238,26 @@ def run_ablation_study(
     
     results = []
     
+    # Ensure train/test have Topic column by merging with topic_info
+    if "Topic" not in train_df.columns:
+        train_df = train_df.merge(topic_info[[id_col, "Topic"]], on=id_col, how="left")
+    if "Topic" not in test_df.columns:
+        test_df = test_df.merge(topic_info[[id_col, "Topic"]], on=id_col, how="left")
+    
     # Estimate time
     topics_per_batch = len(topic_info[topic_info["Topic"] != -1]) // num_batches
-    mins_per_batch = topics_per_batch * 3 / 60  
+    mins_per_batch = topics_per_batch * 3 / 60  # 3 mins per topic
     total_mins = (mins_per_batch * num_batches + (num_batches-1) * wait_time_sec/60) * len(prompts_to_test)
+    print(f"Estimated runtime: ~{total_mins:.1f} minutes ({total_mins/60:.1f} hours)")
+    print(f"{topics_per_batch} topics/batch × {num_batches} batches × {len(prompts_to_test)} prompts\n")
     
     for prompt_name in prompts_to_test:
-
         print(f"Testing prompt: {prompt_name}")
-
         
         # Check if we already have results for this prompt
         result_file = Path(output_dir) / f"{prompt_name}_results.json"
         if result_file.exists():
-            print(f"  Results already exist for {prompt_name}. Skipping...")
+            print(f"Results already exist for {prompt_name}. Skipping...")
             with open(result_file, 'r') as f:
                 results.append(json.load(f))
             continue
@@ -275,12 +265,12 @@ def run_ablation_study(
         prompt_fn = PROMPT_VARIATIONS[prompt_name]
         
         # Label topics using this prompt (with batching)
-        print(f" Labeling topics with '{prompt_name}' prompt...")
+        print(f"Labeling topics with '{prompt_name}' prompt...")
         batches = np.array_split(topic_info, num_batches)
         labels_list = []
         
         for i, batch in enumerate(batches, start=1):
-            print(f"  Batch {i}/{num_batches} ({len(batch)} topics)...")
+            print(f"  Batch {i}/{num_batches} ({len(batch)} topics)")
             start_time = time.time()
             
             try:
@@ -292,10 +282,10 @@ def run_ablation_study(
                 labels_list.append(labels_chunk)
                 
                 elapsed = time.time() - start_time
-                print(f" Batch {i} done in {elapsed/60:.1f} mins")
+                print(f"  Batch {i} completed in {elapsed/60:.1f} mins")
                 
                 if i < num_batches:
-                    print(f"  ⏳ Waiting {wait_time_sec}s...")
+                    print(f"  Waiting {wait_time_sec}s before next batch...")
                     time.sleep(wait_time_sec)
             except Exception as e:
                 print(f"  Error in batch {i}: {e}")
@@ -306,16 +296,15 @@ def run_ablation_study(
         # Save labeled topics
         labels_file = Path(output_dir) / f"{prompt_name}_labels.csv"
         labels_df.to_csv(labels_file, index=False)
-        print(f" Saved labels to {labels_file}")
+        print(f"Labels saved to {labels_file}")
         
         # Evaluate on train set
-        print(f"\n Evaluating on TRAIN set...")
+        print("Evaluating on TRAIN set...")
         train_eval = train_df.copy()
         train_eval = train_eval.merge(labels_df[["Topic", "tuned_topic_name"]], on="Topic", how="left")
         train_eval["predicted_topic_id"] = train_eval["tuned_topic_name"].map(CATEGORY_NAME_TO_INT)
         train_eval["predicted_topic_id"] = train_eval["predicted_topic_id"].fillna(-1).astype(int)
         
-        # Filter outliers
         train_filtered = train_eval[(train_eval["Topic"] != -1) & (train_eval["predicted_topic_id"] != -1)].copy()
         
         train_metrics = eval_function(
@@ -325,13 +314,12 @@ def run_ablation_study(
         )
         
         # Evaluate on test set
-        print(f"\n Evaluating on TEST set...")
+        print("Evaluating on TEST set...")
         test_eval = test_df.copy()
         test_eval = test_eval.merge(labels_df[["Topic", "tuned_topic_name"]], on="Topic", how="left")
         test_eval["predicted_topic_id"] = test_eval["tuned_topic_name"].map(CATEGORY_NAME_TO_INT)
         test_eval["predicted_topic_id"] = test_eval["predicted_topic_id"].fillna(-1).astype(int)
         
-        # Filter outliers
         test_filtered = test_eval[(test_eval["Topic"] != -1) & (test_eval["predicted_topic_id"] != -1)].copy()
         
         test_metrics = eval_function(
@@ -363,14 +351,13 @@ def run_ablation_study(
         
         results.append(result)
         
-        # Save individual result
         with open(result_file, 'w') as f:
             json.dump(result, f, indent=2)
-        print(f" Saved results to {result_file}")
+        print(f"Results saved to {result_file}")
         
-        print(f"\n {prompt_name} complete!")
-        print(f"   Train Macro F1: {train_metrics['macro_f1']:.4f}")
-        print(f"   Test Macro F1:  {test_metrics['macro_f1']:.4f}")
+        print(f"{prompt_name} complete.")
+        print(f"Train Macro F1: {train_metrics['macro_f1']:.4f}")
+        print(f"Test Macro F1:  {test_metrics['macro_f1']:.4f}")
     
     # Save summary
     summary_df = pd.DataFrame([
@@ -388,10 +375,9 @@ def run_ablation_study(
     
     summary_file = Path(output_dir) / "ablation_summary.csv"
     summary_df.to_csv(summary_file, index=False)
-
-    print(f" ABLATION STUDY COMPLETE")
-
+    
+    print("Ablation study complete.")
     print(summary_df.to_string(index=False))
-    print(f"\n Full summary saved to {summary_file}")
+    print(f"Summary saved to {summary_file}")
     
     return results, summary_df
