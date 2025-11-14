@@ -88,6 +88,11 @@ Inside `src/models/`:
 * `own_embeddings.py` → your custom models
 * `direct_prompting.py` → LLM prompting-based embeddings
 
+Exzmple:
+```sh
+python src/models/general_embeddings.py
+```
+
 ---
 
 ##  Outputs
