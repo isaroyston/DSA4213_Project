@@ -16,14 +16,6 @@ root
 │   └── triplet/
 │
 ├── notebooks/                 # Jupyter notebooks for experiments & analysis
-├── plots/                     # Figures generated during evaluation
-│
-├── results/                   # Numerical metrics and reports (e.g., DB Index)
-│   ├── davies_bouldin/
-│   ├── cosine_dbindex.txt
-│   ├── simcse_dbindex.txt
-│   └── triplet_dbindex.txt
-│
 ├── src/
 │   ├── Evaluations/
 │   │   ├── category_alignment.py
