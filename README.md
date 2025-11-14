@@ -27,7 +27,7 @@ root
 │   ├── data_prep.py           # Dataset loading & preprocessing 
 │   ├── fewshot.py             # Few-shot prompting ablation
 │   ├── gemini_utils.py        # Gemini-specific helper wrappers
-│   └── no_others.py           # "No others category" Few-shot prompting ablation
+│   └── no_others.py           # "No others category" prompting ablation
 │
 ├── data_cleaning.py           # Script for cleaning raw data
 ├── loading.py                 # Script for loading datasets / models
