@@ -10,11 +10,6 @@
 root
 ├── embeddings_output/         # path to save generated embedding vectors + projections
 │
-├── finetuned_models/          # Final fine-tuned embedding models
-│   ├── cosine/
-│   ├── simcse/
-│   └── triplet/
-│
 ├── notebooks/                 # Jupyter notebooks for experiments & analysis
 ├── src/
 │   ├── Evaluations/
