@@ -1,10 +1,10 @@
-# **DSA4213 Project**
+# DSA4213 Project
 
 *A framework for generating, fine-tuning, and evaluating sentence embeddings using multiple models (SimCSE, Triplet, Cosine) with analysis tools and benchmarking pipelines.*
 
 ---
 
-## ** Project Structure**
+## Project Structure
 
 ```
 root
@@ -38,15 +38,15 @@ root
 
 ---
 
-## ** Overview**
+##  Overview
 
-This repository contains a full pipeline for **embedding generation, fine-tuning, evaluation, and analysis** across multiple representation-learning approaches:
-* **Own embeddings**
-* **SimCSE**
-* **Triplet embedding models**
-* **Cosine similarity–optimized embeddings**
-* **General embeddings**
-* **Ablation: prompts to Gemini**
+This repository contains a full pipeline for embedding generation, fine-tuning, evaluation, and analysis across multiple representation-learning approaches:
+* Own embeddings
+* SimCSE
+* Triplet embedding models
+* Cosine similarity–optimized embeddings
+* General embeddings
+* Ablation: prompts to Gemini
 
 The project supports:
 
@@ -59,7 +59,7 @@ The project supports:
 
 ---
 
-## ** Installation**
+##  Installation
 
 ```sh
 git clone <your-repo-url>
@@ -71,16 +71,16 @@ pip install -r requirements.txt
 
 ---
 
-## ** Usage**
+##  Usage
 
-### **1. Prepare the data**
+### 1. Prepare the data
 
 ```sh
 python data_cleaning.py
 python loading.py
 ```
 
-### **2. Run embedding models**
+### 2. Run embedding models
 
 Inside `src/models/`:
 
@@ -91,7 +91,7 @@ Inside `src/models/`:
 
 ---
 
-## ** Outputs**
+##  Outputs
 
 All computed outputs are saved in:
 
@@ -102,7 +102,7 @@ All computed outputs are saved in:
 
 ---
 
-## ** Notebooks**
+##  Notebooks
 
 The `notebooks/` folder includes:
 * Category separation analysis
