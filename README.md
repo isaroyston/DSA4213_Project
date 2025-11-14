@@ -55,7 +55,6 @@ The project supports:
 * Evaluating clustering quality (e.g., Davies-Bouldin Index)
 * Comparing category alignment performance
 * Visualising embedding spaces (2D projections)
-* Storing fine-tuned checkpoints & outputs
 
 ---
 
