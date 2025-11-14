@@ -105,7 +105,7 @@ All computed outputs are saved in:
 
 The `notebooks/` folder includes:
 * Category separation analysis
-* * DB Index comparisons
+* DB Index comparisons
 * Hyperparaeter tuning
 * Prompting experiments (few-shot, CoT)
 
