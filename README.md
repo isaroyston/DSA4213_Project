@@ -96,7 +96,7 @@ All computed outputs are saved in:
 
 * `embeddings_output/` → `.npz`, `.csv`, projections
 * `finetuned_models/` → your trained embedding models
-* `results/` → DB index, alignment metrics, logs
+* `results/` → DB index
 * `plots/` → visual embeddings, PCA, t-SNE, etc.
 
 ---
