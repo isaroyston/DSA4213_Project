@@ -12,7 +12,7 @@ root
 │
 ├── notebooks/                 # Jupyter notebooks for experiments & analysis
 ├── src/
-│   ├── Evaluations/
+│   ├── Evaluations/           # eval functions to be imported
 │   │   ├── category_alignment.py
 │   │   └── davies_bouldin.py
 │   │
@@ -88,26 +88,6 @@ Inside `src/models/`:
 * `finetuned_embeddings.py` → fine-tuned model inference
 * `own_embeddings.py` → your custom models
 * `direct_prompting.py` → LLM prompting-based embeddings
-
-Example:
-
-```sh
-python src/models/general_embeddings.py
-```
-
-### **3. Evaluate embeddings**
-
-Category alignment:
-
-```sh
-python src/Evaluations/category_alignment.py
-```
-
-Davies-Bouldin clustering score:
-
-```sh
-python src/Evaluations/davies_bouldin.py
-```
 
 ---
 
